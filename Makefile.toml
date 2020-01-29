@@ -2,18 +2,25 @@
 ELF = "stm32g0-rust"
 DEBUG = "./target/thumbv6m-none-eabi/debug"
 RELEASE = "./target/thumbv6m-none-eabi/release"
+DEVICE = "STM32G031J6"
+IF = "SWD"
+SPEED = "2000"
 
 [tasks.debug]
 dependencies = ["build"]
 script = [
 '''
-arm-none-eabi-gdb ${DEBUG}/${ELF} \
-    -ex "set print asm-demangle on" \
-    -ex "target extended-remote :2331" \
-    -ex "monitor semihosting enable" \
-    -ex "monitor semihosting IOClient 3" \
-    -ex "monitor reset" \
-    -ex "load"
+JLinkGDBServer -device ${DEVICE} -if ${IF} -speed ${SPEED} > /dev/null &
+PID=$!
+script -q /dev/null -c \
+    "arm-none-eabi-gdb ${DEBUG}/${ELF} \
+        -ex 'set print asm-demangle on' \
+        -ex 'target extended-remote :2331' \
+        -ex 'monitor semihosting enable' \
+        -ex 'monitor semihosting IOClient 3' \
+        -ex 'monitor reset' \
+        -ex 'load'"
+kill -2 $PID
 '''
 ]
 
