@@ -1,0 +1,38 @@
+[env]
+ELF = "stm32g0-rust"
+DEBUG = "./target/thumbv6m-none-eabi/debug"
+RELEASE = "./target/thumbv6m-none-eabi/release"
+
+[tasks.debug]
+dependencies = ["build"]
+script = [
+'''
+arm-none-eabi-gdb ${DEBUG}/${ELF} \
+    -ex "set print asm-demangle on" \
+    -ex "target extended-remote :2331" \
+    -ex "monitor semihosting enable" \
+    -ex "monitor semihosting IOClient 3" \
+    -ex "monitor reset" \
+    -ex "load"
+'''
+]
+
+[tasks.bin]
+dependencies = ["build-release"]
+command = "arm-none-eabi-objcopy"
+args = ["${RELEASE}/${ELF}", "-O", "binary", "${RELEASE}/${ELF}.bin"]
+
+[tasks.flash]
+dependencies = ["bin"]
+script = [
+'''
+script=$(mktemp)
+echo "halt" > script
+echo "loadfile ${RELEASE}/${ELF}.bin 0x0" >> script
+echo "r" >> script
+echo "go" >> script
+echo "exit" >> script
+JLinkExe -device STM32G031J6 -if SWD -speed 2000 -commandfile script
+rm script
+'''
+]
