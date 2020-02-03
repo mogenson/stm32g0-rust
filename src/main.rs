@@ -1,33 +1,56 @@
+#![allow(non_upper_case_globals)]
 #![no_std]
 #![no_main]
 
-extern crate cortex_m;
-extern crate cortex_m_rt as rt;
 extern crate panic_halt;
 extern crate stm32g0xx_hal as hal;
 
+use hal::gpio::{gpioa::PA12, Output, PushPull};
 use hal::prelude::*;
-use hal::stm32;
-use rt::entry;
+use hal::stm32::TIM2;
+use hal::timer::Timer;
+use rtfm::app;
 
-mod semihosting; // semihosting println!() macro
+mod semihosting;
 
-#[entry]
-fn main() -> ! {
-    println!("Hello, World!");
-    let dp = stm32::Peripherals::take().expect("cannot take peripherals");
-    let mut rcc = dp.RCC.constrain();
-    let gpioa = dp.GPIOA.split(&mut rcc);
-    let mut led = gpioa.pa12.into_push_pull_output();
+#[app(device = hal::stm32, peripherals = true)]
+const APP: () = {
+    struct Resources {
+        led: PA12<Output<PushPull>>,
+        timer: Timer<TIM2>,
+    }
 
-    loop {
-        println!("led.set_low()");
-        for _ in 0..10_000 {
-            led.set_low().unwrap();
-        }
-        println!("led.set_high()");
-        for _ in 0..10_000 {
-            led.set_high().unwrap();
+    #[init]
+    fn init(ctx: init::Context) -> init::LateResources {
+        println!("init");
+
+        let mut rcc = ctx.device.RCC.constrain();
+        let gpioa = ctx.device.GPIOA.split(&mut rcc);
+        let led = gpioa.pa12.into_push_pull_output();
+
+        let mut timer = ctx.device.TIM2.timer(&mut rcc);
+        timer.start(1.hz());
+        timer.listen();
+
+        init::LateResources { led, timer }
+    }
+
+    #[idle]
+    fn idle(_: idle::Context) -> ! {
+        let mut count: u32 = 0; // this variable can be local
+        loop {
+            println!("idle {}", count);
+            count += 1;
+            rtfm::export::wfi();
         }
     }
-}
+
+    #[task(binds = TIM2, resources = [led, timer])]
+    fn blink(ctx: blink::Context) {
+        static mut count: u32 = 0; // this variable must be static
+        println!("blink {}", count);
+        *count += 1;
+        ctx.resources.led.toggle().unwrap();
+        ctx.resources.timer.clear_irq();
+    }
+};

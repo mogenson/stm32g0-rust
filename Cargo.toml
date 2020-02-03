@@ -6,8 +6,9 @@ name = "stm32g0-rust"
 version = "0.1.0"
 
 [dependencies]
-cortex-m = "0.6.1"
-cortex-m-rt = "0.6.10"
+cortex-m = "0.6.2"
+cortex-m-rt = "0.6.12"
+cortex-m-rtfm = "0.5.1"
 cortex-m-semihosting = "0.3.5"
 panic-halt = "0.2.0"
 
