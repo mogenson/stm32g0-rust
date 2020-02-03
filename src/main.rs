@@ -1,19 +1,33 @@
 #![no_std]
 #![no_main]
 
+extern crate cortex_m;
+extern crate cortex_m_rt as rt;
 extern crate panic_halt;
+extern crate stm32g0xx_hal as hal;
 
-use cortex_m::asm;
-use cortex_m_rt::entry;
-use cortex_m_semihosting::hprintln;
+use hal::prelude::*;
+use hal::stm32;
+use rt::entry;
+
+mod semihosting; // semihosting println!() macro
 
 #[entry]
 fn main() -> ! {
-    asm::nop(); // To not have main optimize to abort in release mode, remove when you add code
-
-    hprintln!("Hello, World!").unwrap();
+    println!("Hello, World!");
+    let dp = stm32::Peripherals::take().expect("cannot take peripherals");
+    let mut rcc = dp.RCC.constrain();
+    let gpioa = dp.GPIOA.split(&mut rcc);
+    let mut led = gpioa.pa12.into_push_pull_output();
 
     loop {
-        // your code goes here
+        println!("led.set_low()");
+        for _ in 0..10_000 {
+            led.set_low().unwrap();
+        }
+        println!("led.set_high()");
+        for _ in 0..10_000 {
+            led.set_high().unwrap();
+        }
     }
 }

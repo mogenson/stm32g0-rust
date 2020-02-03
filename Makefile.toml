@@ -1,19 +1,27 @@
 [env]
-ELF = "stm32g0-rust"
+APP = "stm32g0-rust"
 DEBUG = "./target/thumbv6m-none-eabi/debug"
 RELEASE = "./target/thumbv6m-none-eabi/release"
 DEVICE = "STM32G031J6"
 IF = "SWD"
 SPEED = "2000"
 
+[tasks.build-debug]
+command = "cargo"
+args = ["build", "--features", "semihosting"]
+
+[tasks.build-release]
+command = "cargo"
+args = ["build", "--release"]
+
 [tasks.debug]
-dependencies = ["build"]
+dependencies = ["build-debug"]
 script = [
 '''
     JLinkGDBServer -device ${DEVICE} -if ${IF} -speed ${SPEED} > /dev/null &
     PID=$!
     script -q /dev/null -c \
-        "arm-none-eabi-gdb ${DEBUG}/${ELF} \
+        "arm-none-eabi-gdb ${DEBUG}/${APP} \
             -ex 'set print asm-demangle on' \
             -ex 'target extended-remote :2331' \
             -ex 'monitor semihosting enable' \
@@ -27,7 +35,7 @@ script = [
 [tasks.bin]
 dependencies = ["build-release"]
 command = "arm-none-eabi-objcopy"
-args = ["${RELEASE}/${ELF}", "-O", "binary", "${RELEASE}/${ELF}.bin"]
+args = ["${RELEASE}/${APP}", "-O", "binary", "${RELEASE}/${APP}.bin"]
 
 [tasks.flash]
 dependencies = ["bin"]
@@ -35,9 +43,33 @@ script = [
 '''
     JLinkExe -device ${DEVICE} -if ${IF} -speed ${SPEED} << EOF
         halt
-        loadfile ${RELEASE}/${ELF}.bin 0
+        loadbin ${RELEASE}/${APP}.bin 0x00000000
         r
         go
+        exit
+    EOF
+'''
+]
+
+[tasks.erase]
+script = [
+'''
+    JLinkExe -device ${DEVICE} -if ${IF} -speed ${SPEED} << EOF
+        halt
+        erase
+        r
+        exit
+    EOF
+'''
+]
+
+[tasks.dump]
+script = [
+'''
+    JLinkExe -device ${DEVICE} -if ${IF} -speed ${SPEED} << EOF
+        halt
+        savebin dump.bin 0x00000000 0x8000
+        r
         exit
     EOF
 '''
