@@ -1,6 +1,5 @@
-#![allow(non_upper_case_globals)]
-#![no_std]
 #![no_main]
+#![no_std]
 
 extern crate panic_halt;
 extern crate stm32g0xx_hal as hal;
@@ -11,7 +10,7 @@ use hal::stm32::TIM2;
 use hal::timer::Timer;
 use rtfm::app;
 
-mod semihosting;
+mod debug; // semihosting print
 
 #[app(device = hal::stm32, peripherals = true)]
 const APP: () = {
@@ -22,7 +21,7 @@ const APP: () = {
 
     #[init]
     fn init(ctx: init::Context) -> init::LateResources {
-        println!("init");
+        debug!("init");
 
         let mut rcc = ctx.device.RCC.constrain();
         let gpioa = ctx.device.GPIOA.split(&mut rcc);
@@ -39,7 +38,7 @@ const APP: () = {
     fn idle(_: idle::Context) -> ! {
         let mut count: u32 = 0; // this variable can be local
         loop {
-            println!("idle {}", count);
+            debug!("idle {}", count);
             count += 1;
             rtfm::export::wfi();
         }
@@ -47,9 +46,9 @@ const APP: () = {
 
     #[task(binds = TIM2, resources = [led, timer])]
     fn blink(ctx: blink::Context) {
-        static mut count: u32 = 0; // this variable must be static
-        println!("blink {}", count);
-        *count += 1;
+        static mut COUNT: u32 = 0; // this variable must be static
+        debug!("blink {}", COUNT);
+        *COUNT += 1;
         ctx.resources.led.toggle().unwrap();
         ctx.resources.timer.clear_irq();
     }

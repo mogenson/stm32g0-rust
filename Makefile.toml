@@ -6,16 +6,8 @@ DEVICE = "STM32G031J6"
 IF = "SWD"
 SPEED = "2000"
 
-[tasks.build-debug]
-command = "cargo"
-args = ["build", "--features", "semihosting"]
-
-[tasks.build-release]
-command = "cargo"
-args = ["build", "--release"]
-
 [tasks.debug]
-dependencies = ["build-debug"]
+dependencies = ["build"]
 script = [
 '''
     JLinkGDBServer -device ${DEVICE} -if ${IF} -speed ${SPEED} > /dev/null &

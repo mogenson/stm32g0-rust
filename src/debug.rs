@@ -1,6 +1,6 @@
 #[macro_export]
-#[cfg(feature = "semihosting")]
-macro_rules! println {
+#[cfg(debug_assertions)]
+macro_rules! debug {
     ($($arg:tt)*) => {
         {
             use cortex_m_semihosting::hio;
@@ -12,7 +12,7 @@ macro_rules! println {
 }
 
 #[macro_export]
-#[cfg(not(feature = "semihosting"))]
-macro_rules! println {
+#[cfg(not(debug_assertions))]
+macro_rules! debug {
     ($($arg:tt)*) => {{}};
 }
