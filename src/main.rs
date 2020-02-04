@@ -4,9 +4,10 @@
 extern crate panic_halt;
 extern crate stm32g0xx_hal as hal;
 
-use hal::gpio::{gpioa::PA12, Output, PushPull};
+use hal::exti::Event;
+use hal::gpio::{gpioa, Output, PushPull, SignalEdge};
 use hal::prelude::*;
-use hal::stm32::TIM2;
+use hal::stm32::{EXTI, TIM3};
 use hal::timer::Timer;
 use rtfm::app;
 
@@ -15,8 +16,9 @@ mod debug; // semihosting print
 #[app(device = hal::stm32, peripherals = true)]
 const APP: () = {
     struct Resources {
-        led: PA12<Output<PushPull>>,
-        timer: Timer<TIM2>,
+        led: gpioa::PA12<Output<PushPull>>,
+        timer: Timer<TIM3>,
+        exti: EXTI,
     }
 
     #[init]
@@ -24,14 +26,19 @@ const APP: () = {
         debug!("init");
 
         let mut rcc = ctx.device.RCC.constrain();
+        let mut exti = ctx.device.EXTI;
         let gpioa = ctx.device.GPIOA.split(&mut rcc);
         let led = gpioa.pa12.into_push_pull_output();
+        let _btn = gpioa
+            .pa0
+            .listen(SignalEdge::Falling, &mut exti)
+            .into_pull_up_input();
 
-        let mut timer = ctx.device.TIM2.timer(&mut rcc);
+        let mut timer = ctx.device.TIM3.timer(&mut rcc);
         timer.start(1.hz());
         timer.listen();
 
-        init::LateResources { led, timer }
+        init::LateResources { led, timer, exti }
     }
 
     #[idle]
@@ -44,12 +51,20 @@ const APP: () = {
         }
     }
 
-    #[task(binds = TIM2, resources = [led, timer])]
+    #[task(binds = TIM3, resources = [led, timer])]
     fn blink(ctx: blink::Context) {
         static mut COUNT: u32 = 0; // this variable must be static
         debug!("blink {}", COUNT);
         *COUNT += 1;
         ctx.resources.led.toggle().unwrap();
         ctx.resources.timer.clear_irq();
+    }
+
+    #[task(binds = EXTI0_1, resources = [exti])]
+    fn button(ctx: button::Context) {
+        static mut COUNT: u32 = 0; // this variable must be static
+        debug!("button {}", COUNT);
+        *COUNT += 1;
+        ctx.resources.exti.unpend(Event::GPIO0);
     }
 };
