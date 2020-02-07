@@ -11,7 +11,13 @@ use hal::rcc;
 use hal::stm32::{EXTI, TIM2, USART1};
 use hal::time::Hertz;
 use hal::timer::Timer;
-use hal::{serial, serial::Rx};
+use hal::{serial, serial::Rx, serial::Tx};
+use heapless::{
+    consts::U4,
+    i::Queue as ConstQueue,
+    spsc::{Consumer, Producer, Queue},
+};
+use nb::block;
 use rtfm::app;
 
 macro_rules! log {
@@ -32,6 +38,9 @@ const APP: () = {
         period: Hertz,
         exti: EXTI,
         rx: Rx<USART1>,
+        tx: Tx<USART1>,
+        producer: Producer<'static, u8, U4, u8>,
+        consumer: Consumer<'static, u8, U4, u8>,
     }
 
     #[init]
@@ -49,7 +58,10 @@ const APP: () = {
             .listen(SignalEdge::Falling, &mut exti)
             .into_pull_up_input();
 
-        let (_tx, mut rx) = ctx
+        static mut Q: Queue<u8, U4, u8> = Queue(ConstQueue::u8());
+        let (producer, consumer) = unsafe { Q.split() };
+
+        let (tx, mut rx) = ctx
             .device
             .USART1
             .usart(
@@ -60,7 +72,6 @@ const APP: () = {
             )
             .unwrap()
             .split();
-
         rx.listen();
 
         let period = 1.hz();
@@ -69,18 +80,25 @@ const APP: () = {
         timer.listen();
 
         init::LateResources {
-            led,
-            timer,
-            period,
-            exti,
-            rx,
+            led: led,
+            timer: timer,
+            period: period,
+            exti: exti,
+            rx: rx,
+            tx: tx,
+            producer: producer,
+            consumer: consumer,
         }
     }
 
-    #[idle]
-    fn idle(_: idle::Context) -> ! {
+    #[idle(resources = [tx, consumer])]
+    fn idle(ctx: idle::Context) -> ! {
         loop {
             log!("idle\n");
+            while let Some(byte) = ctx.resources.consumer.dequeue() {
+                let byte = (byte as char).to_ascii_uppercase() as u8;
+                block!(ctx.resources.tx.write(byte)).ok();
+            }
             rtfm::export::wfi();
         }
     }
@@ -88,7 +106,7 @@ const APP: () = {
     #[task(binds = TIM2, resources = [led, timer])]
     fn blink(ctx: blink::Context) {
         log!("blink\n");
-        ctx.resources.led.toggle().unwrap();
+        ctx.resources.led.toggle().ok();
         ctx.resources.timer.clear_irq();
     }
 
@@ -106,8 +124,10 @@ const APP: () = {
         ctx.resources.exti.unpend(exti::Event::GPIO0);
     }
 
-    #[task(binds = USART1, resources = [rx])]
+    #[task(binds = USART1, resources = [rx, producer])]
     fn rx(ctx: rx::Context) {
-        if let Ok(byte) = ctx.resources.rx.read() {}
+        if let Ok(byte) = block!(ctx.resources.rx.read()) {
+            ctx.resources.producer.enqueue(byte).ok();
+        }
     }
 };

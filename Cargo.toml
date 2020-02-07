@@ -10,19 +10,16 @@ cortex-m = "0.6.2"
 cortex-m-rt = "0.6.12"
 cortex-m-rtfm = "0.5.1"
 cortex-m-semihosting = "0.3.5"
+heapless = "0.5.3"
 panic-halt = "0.2.0"
+nb = "0.1.2"
 
 [dependencies.stm32g0xx-hal]
 default-features = false
-#git = "https://github.com/stm32-rs/stm32g0xx-hal.git"
+# git = "https://github.com/stm32-rs/stm32g0xx-hal.git"
+# need local copy until https://github.com/stm32-rs/stm32g0xx-hal/pull/2 is merged
 path = "../stm32g0xx-hal"
 features = ["rt", "stm32g031"]
-
-# [provile.dev]
-# opt-level = 's'   # optimize for size
-# codegen-units = 1 # better optimizations
-# debug = true      # symbols are nice and they don't increase the size on Flash
-# lto = true        # better optimizations"
 
 [profile.release]
 codegen-units = 1
