@@ -2,7 +2,7 @@
 APP = "stm32g0-rust"
 DEBUG = "./target/thumbv6m-none-eabi/debug"
 RELEASE = "./target/thumbv6m-none-eabi/release"
-DEVICE = "STM32G031J6"
+DEVICE = "STM32G031K8"
 IF = "SWD"
 SPEED = "2000"
 

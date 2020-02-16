@@ -11,14 +11,13 @@ cortex-m-rt = "0.6.12"
 cortex-m-rtfm = "0.5.1"
 cortex-m-semihosting = "0.3.5"
 heapless = "0.5.3"
-panic-halt = "0.2.0"
 nb = "0.1.2"
+panic-halt = "0.2.0"
+panic-semihosting = "0.5.3"
 
 [dependencies.stm32g0xx-hal]
 default-features = false
-# git = "https://github.com/stm32-rs/stm32g0xx-hal.git"
-# need local copy until https://github.com/stm32-rs/stm32g0xx-hal/pull/2 is merged
-path = "../stm32g0xx-hal"
+git = "https://github.com/stm32-rs/stm32g0xx-hal.git"
 features = ["rt", "stm32g031"]
 
 [profile.release]
