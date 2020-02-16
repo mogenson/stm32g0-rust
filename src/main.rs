@@ -8,6 +8,7 @@ extern crate panic_semihosting;
 
 extern crate stm32g0xx_hal as hal;
 
+use core::ptr;
 use hal::exti;
 use hal::gpio::{gpioc, Output, PushPull, SignalEdge};
 use hal::prelude::*;
@@ -35,6 +36,10 @@ macro_rules! log {
     }};
 }
 
+extern "C" {
+    static mut _shared: u32;
+}
+
 #[app(device = hal::stm32, peripherals = true)]
 const APP: () = {
     struct Resources {
@@ -51,6 +56,15 @@ const APP: () = {
     #[init]
     fn init(ctx: init::Context) -> init::LateResources {
         log!("init\n");
+
+        unsafe {
+            if ptr::read(&_shared) != 0xDEADBEEF {
+                log!("setting shared ram variable\n");
+                ptr::write(&mut _shared, 0xDEADBEEF);
+            } else {
+                log!("shared ram variable is set\n");
+            }
+        }
 
         let mut rcc = ctx.device.RCC.freeze(rcc::Config::pll()); // 64 MHz
                                                                  //let mut exti = ctx.device.EXTI;
