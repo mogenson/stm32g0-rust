@@ -9,13 +9,10 @@ extern crate panic_semihosting;
 extern crate stm32g0xx_hal as hal;
 
 use core::ptr;
-use hal::exti;
-use hal::gpio::{gpioc, Output, PushPull, SignalEdge};
+use hal::gpio::{gpioc, Output, PushPull};
 use hal::prelude::*;
 use hal::rcc;
-use hal::rcc::ResetMode;
-use hal::stm32::{EXTI, TIM2, USART2};
-use hal::time::Hertz;
+use hal::stm32::{TIM2, USART2};
 use hal::timer::Timer;
 use hal::{serial, serial::Rx, serial::Tx};
 use heapless::{
@@ -45,8 +42,6 @@ const APP: () = {
     struct Resources {
         led: gpioc::PC6<Output<PushPull>>,
         timer: Timer<TIM2>,
-        period: Hertz,
-        //exti: EXTI,
         rx: Rx<USART2>,
         tx: Tx<USART2>,
         producer: Producer<'static, u8, U4, u8>,
@@ -57,27 +52,11 @@ const APP: () = {
     fn init(ctx: init::Context) -> init::LateResources {
         log!("init\n");
 
-        unsafe {
-            if ptr::read(&_shared) != 0xDEADBEEF {
-                log!("setting shared ram variable\n");
-                ptr::write(&mut _shared, 0xDEADBEEF);
-            } else {
-                log!("shared ram variable is set\n");
-            }
-        }
-
         let mut rcc = ctx.device.RCC.freeze(rcc::Config::pll()); // 64 MHz
-                                                                 //let mut exti = ctx.device.EXTI;
         let gpioa = ctx.device.GPIOA.split(&mut rcc);
         let gpioc = ctx.device.GPIOC.split(&mut rcc);
-        //let gpiof = ctx.device.GPIOF.split(&mut rcc);
 
         let led = gpioc.pc6.into_push_pull_output();
-
-        // let _btn = gpiof
-        //     .pf2
-        //     .listen(SignalEdge::Falling, &mut exti)
-        //     .into_pull_up_input();
 
         static mut Q: Queue<u8, U4, u8> = Queue(ConstQueue::u8());
         let (producer, consumer) = unsafe { Q.split() };
@@ -95,16 +74,21 @@ const APP: () = {
             .split();
         rx.listen();
 
-        let period = 1.hz();
+        let period = unsafe { ptr::read(&_shared) };
+        let period = match period {
+            1 => 4,
+            4 => 1,
+            _ => 1,
+        };
+        unsafe { ptr::write(&mut _shared, period) };
+
         let mut timer = ctx.device.TIM2.timer(&mut rcc);
-        timer.start(period);
+        timer.start(period.hz());
         timer.listen();
 
         init::LateResources {
             led: led,
             timer: timer,
-            period: period,
-            //exti: exti,
             rx: rx,
             tx: tx,
             producer: producer,
@@ -130,23 +114,6 @@ const APP: () = {
         ctx.resources.led.toggle().ok();
         ctx.resources.timer.clear_irq();
     }
-
-    // #[task(binds = EXTI2_3, resources = [exti, timer, period])]
-    // fn button(ctx: button::Context) {
-    //     log!("button\n");
-    //     let period = ctx.resources.period;
-    //     if *period == 1.hz() {
-    //         *period = 4.hz();
-    //         ctx.resources.timer.start(*period);
-    //     } else {
-    //         *period = 1.hz();
-    //         ctx.resources.timer.start(*period);
-    //     }
-    //     ctx.resources.exti.unpend(exti::Event::GPIO2);
-    //     //let _rpr1 = &ctx.resources.exti.rpr1;
-    //     let _fpr1 = &ctx.resources.exti.fpr1;
-    //     let _x = 5;
-    // }
 
     #[task(binds = USART2, resources = [rx, producer])]
     fn rx(ctx: rx::Context) {
